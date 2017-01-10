@@ -3,7 +3,11 @@ package io.defn.crontab
 import org.parboiled2._
 
 
-private class CronSpecParser(val input: ParserInput) extends Parser {
+private class SpecParser(val input: ParserInput) extends Parser {
+  import Field._
+  import Month._
+  import Weekday._
+
   type Meta[T] = () => Rule1[T]
 
   def number: Rule1[Int] = rule {
@@ -116,7 +120,7 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     ) ~ whitespace
   }
 
-  def spec: Rule1[CronSpec] = rule {
+  def spec: Rule1[Spec] = rule {
     ( whitespace
       ~ field(minute).named("a minute field")
       ~ field(hour).named("an hour field")
@@ -127,40 +131,35 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     ) ~> {
       (minute: Field[Minute], hour: Field[Hour], day: Field[Day], month: Field[Month], weekday: Field[Weekday]) =>
 
-      CronSpec(minute, hour, day, month, weekday)
+      Spec(minute, hour, day, month, weekday)
     }
   }
 
-  def yearly: Rule1[CronSpec] = rule {
-    (ignoreCase("yearly") | ignoreCase("annually")) ~
-      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Exact(Jan), Every[Weekday]))
+  def yearly: Rule1[Spec] = rule {
+    (ignoreCase("yearly") | ignoreCase("annually")) ~ push(Spec.yearly)
   }
 
-  def monthly: Rule1[CronSpec] = rule {
-    ignoreCase("monthly") ~
-      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Every[Month], Every[Weekday]))
+  def monthly: Rule1[Spec] = rule {
+    ignoreCase("monthly") ~ push(Spec.monthly)
   }
 
-  def weekly: Rule1[CronSpec] = rule {
-    ignoreCase("weekly") ~
-      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Every[Day], Every[Month], Exact(Sun)))
+  def weekly: Rule1[Spec] = rule {
+    ignoreCase("weekly") ~ push(Spec.weekly)
   }
 
-  def daily: Rule1[CronSpec] = rule {
-    (ignoreCase("daily") | ignoreCase("midnight")) ~
-      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Every[Day], Every[Month], Every[Weekday]))
+  def daily: Rule1[Spec] = rule {
+    (ignoreCase("daily") | ignoreCase("midnight")) ~ push(Spec.daily)
   }
 
-  def hourly: Rule1[CronSpec] = rule {
-    ignoreCase("hourly") ~
-      push(CronSpec(Exact(Minute(0)), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
+  def hourly: Rule1[Spec] = rule {
+    ignoreCase("hourly") ~ push(Spec.hourly)
   }
 
-  def special: Rule1[CronSpec] = rule {
+  def special: Rule1[Spec] = rule {
     '@' ~!~ (yearly | monthly | weekly | daily | hourly) ~ EOI.named("the end of input")
   }
 
-  def toplevel: Rule1[CronSpec] = rule {
+  def toplevel: Rule1[Spec] = rule {
     spec.named("a spec like '0 * * * Sun'") | special.named("a named rule like '@daily'")
   }
 
