@@ -4,7 +4,19 @@ organization := "io.defn"
 
 version := "0.0.1"
 
-scalaVersion := "2.12.1"
+scalaVersion in ThisBuild := "2.12.1"
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-encoding", "UTF-8",
+  "-feature",
+  "-unchecked",
+  "-Xfuture",
+  "-Yno-adapted-args",
+  "-Ywarn-dead-code",
+  "-Ywarn-numeric-widen",
+  "-Ywarn-unused",
+  "-Ywarn-value-discard"
+)
 
 libraryDependencies ++= Seq(
   "org.parboiled" %% "parboiled" % "2.1.3",
