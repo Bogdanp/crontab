@@ -9,10 +9,25 @@ import scala.util.{Failure, Success}
   * crontab`.
   *
   * {{{
-  * val Right(c) = CronSpecParser.parse("* * * * *")
+  * scala> val Right(c) = CronSpecParser.parse("* * * * *")
+  * c: CronSpec = CronSpec(Every(), Every(), Every(), Every(), Every())
+  * }}}
+  *
+  * Parsing can fail:
+  *
+  * {{{
+  * scala> val Left(error) = CronSpecParser.parse("foo")
+  * error: String =
+  * Invalid input 'f', expected a spec like '0 * * * Sun' or a named rule like '@daily' (line 1, column 1):
+  * foo
+  * ^
   * }}}
   */
 object CronSpecParser {
+  /** Attempt to parse a string to a [[CronSpec]].  Returns either
+    * [[CronSpec]] on success or [[String]] on error
+    * indicating the parse error.
+    */
   def parse(input: String): Either[String, CronSpec] = {
     val parser = new CronSpecParser(input)
 
@@ -100,7 +115,6 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     )
   }
 
-
   val minute  = () => rule { number(0, 60) ~> (Minute(_)) }
   val hour    = () => rule { number(0, 24) ~> (Hour(_)) }
   val day     = () => rule { number(1, 32) ~> (Day(_)) }
@@ -144,7 +158,7 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     ) ~ whitespace
   }
 
-  def toplevel = rule {
+  def spec: Rule1[CronSpec] = rule {
     ( whitespace
       ~ field(minute).named("a minute field")
       ~ field(hour).named("an hour field")
@@ -159,7 +173,40 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     }
   }
 
-  def whitespace = rule {
+  def yearly: Rule1[CronSpec] = rule {
+    (ignoreCase("yearly") | ignoreCase("annually")) ~
+      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Exact(Jan), Every[Weekday]))
+  }
+
+  def monthly: Rule1[CronSpec] = rule {
+    ignoreCase("monthly") ~
+      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Every[Month], Every[Weekday]))
+  }
+
+  def weekly: Rule1[CronSpec] = rule {
+    ignoreCase("weekly") ~
+      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Every[Day], Every[Month], Exact(Sun)))
+  }
+
+  def daily: Rule1[CronSpec] = rule {
+    (ignoreCase("daily") | ignoreCase("midnight")) ~
+      push(CronSpec(Exact(Minute(0)), Exact(Hour(0)), Every[Day], Every[Month], Every[Weekday]))
+  }
+
+  def hourly: Rule1[CronSpec] = rule {
+    ignoreCase("hourly") ~
+      push(CronSpec(Exact(Minute(0)), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
+  }
+
+  def special: Rule1[CronSpec] = rule {
+    '@' ~!~ (yearly | monthly | weekly | daily | hourly) ~ EOI.named("the end of input")
+  }
+
+  def toplevel: Rule1[CronSpec] = rule {
+    spec.named("a spec like '0 * * * Sun'") | special.named("a named rule like '@daily'")
+  }
+
+  def whitespace: Rule0 = rule {
     quiet(zeroOrMore(anyOf(" \t")))
   }
 }
