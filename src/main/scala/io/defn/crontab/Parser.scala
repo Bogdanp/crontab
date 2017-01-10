@@ -73,9 +73,9 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
     )
   }
 
-  val minute  = () => rule { number(0, 60) ~> (Minute(_)) }
-  val hour    = () => rule { number(0, 24) ~> (Hour(_)) }
-  val day     = () => rule { number(1, 32) ~> (Day(_)) }
+  val minute  = () => rule { number(0, 60) ~> Minute }
+  val hour    = () => rule { number(0, 24) ~> Hour }
+  val day     = () => rule { number(1, 32) ~> Day }
   val month   = () => rule { monthDigit | monthLiteral }
   val weekday = () => rule { weekdayDigit | weekdayLiteral }
 
@@ -88,7 +88,7 @@ private class CronSpecParser(val input: ParserInput) extends Parser {
   }
 
   def range[T](inner: Meta[T]) = rule {
-    inner() ~ '-' ~ inner() ~> (Range(_, _))
+    inner() ~ '-' ~!~ inner() ~> (Range(_, _))
   }
 
   def step[T](inner: Meta[T]) = rule {
