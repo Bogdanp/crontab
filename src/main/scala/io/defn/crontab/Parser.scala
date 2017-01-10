@@ -2,48 +2,6 @@ package io.defn.crontab
 
 import org.parboiled2._
 
-import scala.util.{Failure, Success}
-
-
-/** Parses crontab time and date entries according to `man 5
-  * crontab`.
-  *
-  * {{{
-  * scala> val Right(c) = CronSpecParser.parse("* * * * *")
-  * c: CronSpec = CronSpec(Every(), Every(), Every(), Every(), Every())
-  * }}}
-  *
-  * Parsing can fail:
-  *
-  * {{{
-  * scala> val Left(error) = CronSpecParser.parse("foo")
-  * error: String =
-  * Invalid input 'f', expected a spec like '0 * * * Sun' or a named rule like '@daily' (line 1, column 1):
-  * foo
-  * ^
-  * }}}
-  */
-object CronSpecParser {
-  /** Attempt to parse a string to a [[CronSpec]].  Returns either
-    * [[CronSpec]] on success or [[String]] on error
-    * indicating the parse error.
-    */
-  def parse(input: String): Either[String, CronSpec] = {
-    val parser = new CronSpecParser(input)
-
-    parser.toplevel.run() match {
-      case Success(c) =>
-        Right(c)
-
-      case Failure(e: ParseError) =>
-        Left(parser.formatError(e))
-
-      case Failure(e) =>
-        Left(s"Unexpected error while parsing: ${e.getMessage}")
-    }
-  }
-}
-
 
 private class CronSpecParser(val input: ParserInput) extends Parser {
   type Meta[T] = () => Rule1[T]
