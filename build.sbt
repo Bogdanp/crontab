@@ -4,7 +4,7 @@ organization := "io.defn"
 
 version := "0.0.1"
 
-scalaVersion in ThisBuild := "2.12.1"
+scalaVersion in ThisBuild := "2.11.8"
 scalacOptions ++= Seq(
   "-deprecation",
   "-encoding", "UTF-8",
