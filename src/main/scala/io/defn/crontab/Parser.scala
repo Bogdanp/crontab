@@ -83,27 +83,34 @@ private class SpecParser(val input: ParserInput) extends Parser {
   val month   = () => rule { monthDigit | monthLiteral }
   val weekday = () => rule { weekdayDigit | weekdayLiteral }
 
-  def every[T]: Rule1[Field[T]] = rule {
+  def every[T <: CanMatch]: Rule1[Field[T]] = rule {
     ch('*') ~ push(Every())
   }
 
-  def exact[T](inner: Meta[T]) = rule {
+  def exact[T <: CanMatch](inner: Meta[T]) = rule {
     inner() ~> (Exact(_))
   }
 
-  def range[T](inner: Meta[T]) = rule {
+  def range[T <: CanMatch](inner: Meta[T]) = rule {
     inner() ~ '-' ~!~ inner() ~> (Range(_, _))
   }
 
-  def step[T](inner: Meta[T]) = rule {
-    (range(inner) | every[T]) ~ '/' ~!~ number ~> (Step(_, _))
+  def step[T <: CanMatch](inner: Meta[T], first: T, last: T) = rule {
+    (range(inner) | every[T]) ~ '/' ~!~ number ~> { (field: Field[T], step: Int) =>
+      field match {
+        case Every()        => Range(first, last, step)
+        case Range(a, b, _) => Range(a, b, step)
+
+        case _ => throw new RuntimeException("impossible case")
+      }
+    }
   }
 
-  def component[T](inner: Meta[T]) = rule {
+  def component[T <: CanMatch](inner: Meta[T]) = rule {
     range(inner) | exact(inner)
   }
 
-  def sequence[T](inner: Meta[T]) = rule {
+  def sequence[T <: CanMatch](inner: Meta[T]) = rule {
     (component(inner)) ~ ',' ~!~ oneOrMore(component(inner)).separatedBy(',') ~> {
       (head: Field[T], tail: Seq[Field[T]]) =>
 
@@ -111,8 +118,8 @@ private class SpecParser(val input: ParserInput) extends Parser {
     }
   }
 
-  def field[T](inner: Meta[T]) = rule {
-    ( step(inner).named("a step")
+  def field[T <: CanMatch](inner: Meta[T], first: T, last: T) = rule {
+    ( step(inner, first, last).named("a step")
       | every[T].named("*")
       | sequence(inner).named("a comma-separated sequence")
       | range(inner).named("a range")
@@ -122,11 +129,11 @@ private class SpecParser(val input: ParserInput) extends Parser {
 
   def spec: Rule1[Spec] = rule {
     ( whitespace
-      ~ field(minute).named("a minute field")
-      ~ field(hour).named("an hour field")
-      ~ field(day).named("a day field")
-      ~ field(month).named("a month field")
-      ~ field(weekday).named("a weekday field")
+      ~ field(minute, first = Minute(0), last = Minute(59)).named("a minute field")
+      ~ field(hour, first = Hour(0), last = Hour(23)).named("an hour field")
+      ~ field(day, first = Day(1), last = Day(31)).named("a day field")
+      ~ field(month, first = Jan, last = Dec).named("a month field")
+      ~ field(weekday, first = Mon, last = Sun).named("a weekday field")
       ~ EOI.named("the end of input")
     ) ~> {
       (minute: Field[Minute], hour: Field[Hour], day: Field[Day], month: Field[Month], weekday: Field[Weekday]) =>

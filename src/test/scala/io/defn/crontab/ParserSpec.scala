@@ -58,17 +58,17 @@ class ParserSpec extends FunSpec with Matchers {
 
       it("should parse asterisk-based steps correctly") {
         Spec.parse("*/2 * * * *") shouldEqual Right(Spec(
-          Step(Every[Minute], 2), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
+          Range(Minute(0), Minute(59), 2), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
       }
 
       it("should parse range-based steps correctly") {
         Spec.parse("10-20/2 * * * *") shouldEqual Right(Spec(
-          Step(Range(Minute(10), Minute(20)), 2), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
+          Range(Minute(10), Minute(20), 2), Every[Hour], Every[Day], Every[Month], Every[Weekday]))
       }
 
       it("should parse range-based steps of months correctly") {
         Spec.parse("* * * jan-sep/2 *") shouldEqual Right(Spec(
-          Every[Minute], Every[Hour], Every[Day], Step(Range(Month.Jan, Month.Sep), 2), Every[Weekday]))
+          Every[Minute], Every[Hour], Every[Day], Range(Month.Jan, Month.Sep, 2), Every[Weekday]))
       }
 
       it("should parse sequences correctly") {

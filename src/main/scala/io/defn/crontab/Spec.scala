@@ -1,21 +1,49 @@
 package io.defn.crontab
 
+import java.time.ZonedDateTime
+
 import org.parboiled2.ParseError
 
 import scala.util.{Failure, Success}
 
 
-final case class Minute(val value: Int) extends AnyVal
-final case class Hour(val value: Int) extends AnyVal
-final case class Day(val value: Int) extends AnyVal
+trait CanMatch {
+  def value: Int
+
+  def matches(other: Int): Boolean =
+    value == other
+
+  def plus(n: Int): CanMatch
+}
+
+
+final case class Minute(val value: Int) extends CanMatch {
+  def plus(n: Int): Minute =
+    Minute((value + n) % 60)
+}
+
+
+final case class Hour(val value: Int) extends CanMatch {
+  def plus(n: Int): Hour =
+    Hour((value + n) % 24)
+}
+
+
+final case class Day(val value: Int) extends CanMatch {
+  def plus(n: Int): Day =
+    Day((value + n - 1) % 31 + 1)
+}
 
 
 /** Sum type representing the months of the year. */
-sealed trait Month extends Ordering[Month] {
+sealed trait Month extends Ordering[Month] with CanMatch {
   def compare(a: Month, b: Month): Int =
-    a.ord compare b.ord
+    a.value compare b.value
 
-  lazy val ord: Int =
+  def plus(n: Int): Month =
+    Month((value + n - 1) % 12 + 1)
+
+  lazy val value: Int =
     this match {
       case Month.Jan => 1
       case Month.Feb => 2
@@ -33,6 +61,23 @@ sealed trait Month extends Ordering[Month] {
 }
 
 object Month {
+  def apply(month: Int): Month =
+    month match {
+      case 1 => Jan
+      case 2 => Feb
+      case 3 => Mar
+      case 4 => Apr
+      case 5 => May
+      case 6 => Jun
+      case 7 => Jul
+      case 8 => Aug
+      case 9 => Sep
+      case 10 => Oct
+      case 11 => Nov
+      case 12 => Dec
+      case _  => throw new RuntimeException(s"invalid month '${month}'")
+    }
+
   final case object Jan extends Month
   final case object Feb extends Month
   final case object Mar extends Month
@@ -49,11 +94,14 @@ object Month {
 
 
 /** Sum type representing the days of the week. */
-sealed trait Weekday extends Ordering[Weekday] {
+sealed trait Weekday extends Ordering[Weekday] with CanMatch {
   def compare(a: Weekday, b: Weekday): Int =
-    a.ord compare b.ord
+    a.value compare b.value
 
-  lazy val ord: Int =
+  def plus(n: Int): Weekday =
+    Weekday((value + n - 1) % 7 + 1)
+
+  lazy val value: Int =
     this match {
       case Weekday.Mon => 1
       case Weekday.Tue => 2
@@ -66,6 +114,19 @@ sealed trait Weekday extends Ordering[Weekday] {
 }
 
 object Weekday {
+  def apply(weekday: Int): Weekday =
+    weekday match {
+      case 1 => Mon
+      case 2 => Tue
+      case 3 => Wed
+      case 4 => Thu
+      case 5 => Fri
+      case 6 => Sat
+      case 7 => Sun
+      case 0 => Sun
+      case _  => throw new RuntimeException(s"invalid weekday '${weekday}'")
+    }
+
   final case object Mon extends Weekday
   final case object Tue extends Weekday
   final case object Wed extends Weekday
@@ -76,14 +137,37 @@ object Weekday {
 }
 
 
-sealed trait Field[+T]
+sealed trait Field[+T <: CanMatch] {
+  def matches(value: Int): Boolean =
+    this match {
+      case Field.Every() =>
+        true
+
+      case Field.Exact(f) =>
+        f.matches(value)
+
+      case Field.Range(a, b, step) => {
+        def range(x: CanMatch, s: Int = 0): Stream[CanMatch] =
+          (s, x == b) match {
+            case (0, true)  => Stream(x)
+            case (_, true)  => Stream.empty
+            case (0, false) => x #:: range(x.plus(1), step - 1)
+            case (_, false) => range(x.plus(1), s - 1)
+          }
+
+        range(a).exists(_.matches(value))
+      }
+
+      case Field.Sequence(fs) =>
+        fs.exists(_.matches(value))
+    }
+}
 
 object Field {
-  final case class Every[T]() extends Field[T]
-  final case class Exact[T](value: T) extends Field[T]
-  final case class Range[T](from: T, to: T) extends Field[T]
-  final case class Step[T](range: Field[T], step: Int) extends Field[T]
-  final case class Sequence[T](fields: Seq[Field[T]]) extends Field[T]
+  final case class Every[T <: CanMatch]() extends Field[T]
+  final case class Exact[T <: CanMatch](value: T) extends Field[T]
+  final case class Range[T <: CanMatch](from: T, to: T, step: Int = 1) extends Field[T]
+  final case class Sequence[T <: CanMatch](fields: Seq[Field[T]]) extends Field[T]
 }
 
 
@@ -95,8 +179,40 @@ case class Spec(
   hour: Field[Hour],
   day: Field[Day],
   month: Field[Month],
-  weekday: Field[Weekday]
-)
+  weekday: Field[Weekday]) {
+
+  /** Returns a [[Stream]] of [[ZonedDateTime]]s that match this spec
+    * starting from the very next minute. */
+  def dateTimes: Stream[ZonedDateTime] =
+    dateTimes(ZonedDateTime.now().plusMinutes(1))
+
+  /** Returns a [[Stream]] of [[ZonedDateTime]]s that match this spec
+    * starting from [[start]]. */
+  def dateTimes(start: ZonedDateTime): Stream[ZonedDateTime] = {
+    val dateTime = next(start)
+
+    dateTime #:: dateTimes(dateTime.plusMinutes(1))
+  }
+
+  /** Returns `true` if this [[Spec]] matches the given
+    * [[ZonedDateTime]]. */
+  def matches(dateTime: ZonedDateTime): Boolean =
+    ( minute.matches(dateTime.getMinute())
+      && hour.matches(dateTime.getHour())
+      && day.matches(dateTime.getDayOfMonth())
+      && month.matches(dateTime.getMonthValue())
+      && weekday.matches(dateTime.getDayOfWeek().getValue())
+    )
+
+  private[this] def next(start: ZonedDateTime): ZonedDateTime = {
+    var now = start.withSecond(0).withNano(0)
+
+    while (!matches(now))
+      now = now.plusMinutes(1)
+
+    now
+  }
+}
 
 
 /** Parses crontab time and date specs according to `man 5 crontab`.
