@@ -3,7 +3,7 @@ package io.defn.crontab
 import org.scalatest._
 
 
-class ParserSpec extends FunSpec with Matchers {
+class SpecParserSpec extends FunSpec with Matchers {
   import Field._
 
   val namedRules = Map(
