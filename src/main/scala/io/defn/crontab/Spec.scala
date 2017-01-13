@@ -18,18 +18,27 @@ trait CanMatch {
 
 
 final case class Minute(val value: Int) extends CanMatch {
+  require(0 <= value, "minutes must be >=0")
+  require(value < 60, "minutes must be <60")
+
   def plus(n: Int): Minute =
     Minute((value + n) % 60)
 }
 
 
 final case class Hour(val value: Int) extends CanMatch {
+  require(0 <= value, "hours must be >=0")
+  require(value < 24, "hours must be <24")
+
   def plus(n: Int): Hour =
     Hour((value + n) % 24)
 }
 
 
 final case class Day(val value: Int) extends CanMatch {
+  require(1 <= value, "days must be >=1")
+  require(value < 32, "days must be <32")
+
   def plus(n: Int): Day =
     Day((value + n - 1) % 31 + 1)
 }
