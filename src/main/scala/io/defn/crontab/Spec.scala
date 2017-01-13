@@ -7,8 +7,11 @@ import org.parboiled2.ParseError
 import scala.util.{Failure, Success}
 
 
-trait CanMatch {
+trait CanMatch extends Ordered[CanMatch] {
   def value: Int
+
+  def compare(that: CanMatch): Int =
+    value - that.value
 
   def matches(other: Int): Boolean =
     value == other
@@ -45,27 +48,42 @@ final case class Day(val value: Int) extends CanMatch {
 
 
 /** Sum type representing the months of the year. */
-sealed trait Month extends Ordering[Month] with CanMatch {
-  def compare(a: Month, b: Month): Int =
-    a.value compare b.value
+sealed trait Month extends CanMatch {
+  import Month._
 
   def plus(n: Int): Month =
     Month((value + n - 1) % 12 + 1)
 
   lazy val value: Int =
     this match {
-      case Month.Jan => 1
-      case Month.Feb => 2
-      case Month.Mar => 3
-      case Month.Apr => 4
-      case Month.May => 5
-      case Month.Jun => 6
-      case Month.Jul => 7
-      case Month.Aug => 8
-      case Month.Sep => 9
-      case Month.Oct => 10
-      case Month.Nov => 11
-      case Month.Dec => 12
+      case Jan => 1
+      case Feb => 2
+      case Mar => 3
+      case Apr => 4
+      case May => 5
+      case Jun => 6
+      case Jul => 7
+      case Aug => 8
+      case Sep => 9
+      case Oct => 10
+      case Nov => 11
+      case Dec => 12
+    }
+
+  lazy val daysInMonth: Seq[Int] =
+    this match {
+      case Jan => Seq(31)
+      case Feb => Seq(28, 29)
+      case Mar => Seq(31)
+      case Apr => Seq(30)
+      case May => Seq(31)
+      case Jun => Seq(30)
+      case Jul => Seq(31)
+      case Aug => Seq(31)
+      case Sep => Seq(30)
+      case Oct => Seq(31)
+      case Nov => Seq(30)
+      case Dec => Seq(31)
     }
 }
 
@@ -103,22 +121,21 @@ object Month {
 
 
 /** Sum type representing the days of the week. */
-sealed trait Weekday extends Ordering[Weekday] with CanMatch {
-  def compare(a: Weekday, b: Weekday): Int =
-    a.value compare b.value
+sealed trait Weekday extends CanMatch {
+  import Weekday._
 
   def plus(n: Int): Weekday =
     Weekday((value + n - 1) % 7 + 1)
 
   lazy val value: Int =
     this match {
-      case Weekday.Mon => 1
-      case Weekday.Tue => 2
-      case Weekday.Wed => 3
-      case Weekday.Thu => 4
-      case Weekday.Fri => 5
-      case Weekday.Sat => 6
-      case Weekday.Sun => 7
+      case Mon => 1
+      case Tue => 2
+      case Wed => 3
+      case Thu => 4
+      case Fri => 5
+      case Sat => 6
+      case Sun => 7
     }
 }
 

@@ -95,6 +95,16 @@ class SpecParserSpec extends FunSpec with Matchers {
 
         Spec.parse("foo") shouldEqual Left(message)
       }
+
+      it("should fail to parse invalid ranges") {
+        val message =
+          """Invalid input ' ', expected an increasing range, not 'Minute(10)-Minute(5)' (line 1, column 5):
+            |10-5 * * * *
+            |    ^
+          """.stripMargin.trim
+
+        Spec.parse("10-5 * * * *") shouldEqual Left(message)
+      }
     }
   }
 }
