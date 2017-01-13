@@ -48,12 +48,12 @@ class SpecParserSpec extends FunSpec with Matchers {
 
       it("should parse exact months correctly") {
         Spec.parse("0 0 1 Jan *") shouldEqual Right(Spec(
-          Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Exact(Month.Jan), Every[Weekday]))
+          Exact(Minute(0)), Exact(Hour(0)), Exact(Day(1)), Exact[Month](Month.Jan), Every[Weekday]))
       }
 
       it("should parse exact weekdays correctly") {
         Spec.parse("* * * * Sun") shouldEqual Right(Spec(
-          Every[Minute], Every[Hour], Every[Day], Every[Month], Exact(Weekday.Sun)))
+          Every[Minute], Every[Hour], Every[Day], Every[Month], Exact[Weekday](Weekday.Sun)))
       }
 
       it("should parse asterisk-based steps correctly") {
@@ -68,7 +68,7 @@ class SpecParserSpec extends FunSpec with Matchers {
 
       it("should parse range-based steps of months correctly") {
         Spec.parse("* * * jan-sep/2 *") shouldEqual Right(Spec(
-          Every[Minute], Every[Hour], Every[Day], Range(Month.Jan, Month.Sep, 2), Every[Weekday]))
+          Every[Minute], Every[Hour], Every[Day], Range[Month](Month.Jan, Month.Sep, 2), Every[Weekday]))
       }
 
       it("should parse sequences correctly") {
@@ -104,6 +104,15 @@ class SpecParserSpec extends FunSpec with Matchers {
           """.stripMargin.trim
 
         Spec.parse("10-5 * * * *") shouldEqual Left(message)
+      }
+
+      it("should fail to parse invalid dates") {
+        Spec.parse("* * 30 Feb *") shouldEqual Left("Invalid spec: day cannot be 30 for month Feb")
+        Spec.parse("* * 31 Apr *") shouldEqual Left("Invalid spec: day cannot be 31 for month Apr")
+      }
+
+      it("should fail to parse invalid date ranges") {
+        Spec.parse("* * 30-31 Feb *") shouldEqual Left("Invalid spec: range of days cannot be Range(Day(30),Day(31),1) for month Feb")
       }
     }
   }

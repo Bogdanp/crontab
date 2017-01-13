@@ -41,7 +41,7 @@ class FieldSpec extends FunSpec with Matchers {
     }
 
     it("matches ranges of weekdays") {
-      val range = Range(Weekday.Mon, Weekday.Sun, 2)
+      val range = Range[Weekday](Weekday.Mon, Weekday.Sun, 2)
 
       for (i <- 1 to 7) {
         if (i % 2 != 0) range.matches(i) shouldBe true
@@ -50,7 +50,7 @@ class FieldSpec extends FunSpec with Matchers {
     }
 
     it("matches ranges of values with weird steps") {
-      val range = Range(Weekday.Mon, Weekday.Sun, 5)
+      val range = Range[Weekday](Weekday.Mon, Weekday.Sun, 5)
 
       for (i <- 1 to 7) {
         if (Seq(1, 6) contains i) range.matches(i) shouldBe true

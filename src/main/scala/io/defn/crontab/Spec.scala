@@ -7,20 +7,20 @@ import org.parboiled2.ParseError
 import scala.util.{Failure, Success}
 
 
-trait CanMatch extends Ordered[CanMatch] {
+trait CanMatch[Self <: CanMatch[_]] extends Ordered[Self] {
   def value: Int
 
-  def compare(that: CanMatch): Int =
+  def compare(that: Self): Int =
     value - that.value
 
   def matches(other: Int): Boolean =
     value == other
 
-  def plus(n: Int): CanMatch
+  def plus(n: Int): Self
 }
 
 
-final case class Minute(val value: Int) extends CanMatch {
+final case class Minute(val value: Int) extends CanMatch[Minute] {
   require(0 <= value, "minutes must be >=0")
   require(value < 60, "minutes must be <60")
 
@@ -29,7 +29,7 @@ final case class Minute(val value: Int) extends CanMatch {
 }
 
 
-final case class Hour(val value: Int) extends CanMatch {
+final case class Hour(val value: Int) extends CanMatch[Hour] {
   require(0 <= value, "hours must be >=0")
   require(value < 24, "hours must be <24")
 
@@ -38,7 +38,7 @@ final case class Hour(val value: Int) extends CanMatch {
 }
 
 
-final case class Day(val value: Int) extends CanMatch {
+final case class Day(val value: Int) extends CanMatch[Day] {
   require(1 <= value, "days must be >=1")
   require(value < 32, "days must be <32")
 
@@ -48,7 +48,7 @@ final case class Day(val value: Int) extends CanMatch {
 
 
 /** Sum type representing the months of the year. */
-sealed trait Month extends CanMatch {
+sealed trait Month extends CanMatch[Month] {
   import Month._
 
   def plus(n: Int): Month =
@@ -70,20 +70,20 @@ sealed trait Month extends CanMatch {
       case Dec => 12
     }
 
-  lazy val daysInMonth: Seq[Int] =
+  lazy val maxDaysInMonth: Int =
     this match {
-      case Jan => Seq(31)
-      case Feb => Seq(28, 29)
-      case Mar => Seq(31)
-      case Apr => Seq(30)
-      case May => Seq(31)
-      case Jun => Seq(30)
-      case Jul => Seq(31)
-      case Aug => Seq(31)
-      case Sep => Seq(30)
-      case Oct => Seq(31)
-      case Nov => Seq(30)
-      case Dec => Seq(31)
+      case Jan => 31
+      case Feb => 29
+      case Mar => 31
+      case Apr => 30
+      case May => 31
+      case Jun => 30
+      case Jul => 31
+      case Aug => 31
+      case Sep => 30
+      case Oct => 31
+      case Nov => 30
+      case Dec => 31
     }
 }
 
@@ -121,7 +121,7 @@ object Month {
 
 
 /** Sum type representing the days of the week. */
-sealed trait Weekday extends CanMatch {
+sealed trait Weekday extends CanMatch[Weekday] {
   import Weekday._
 
   def plus(n: Int): Weekday =
@@ -163,7 +163,7 @@ object Weekday {
 }
 
 
-sealed trait Field[+T <: CanMatch] {
+sealed trait Field[+T <: CanMatch[_]] {
   def matches(value: Int): Boolean =
     this match {
       case Field.Every() =>
@@ -172,17 +172,8 @@ sealed trait Field[+T <: CanMatch] {
       case Field.Exact(f) =>
         f.matches(value)
 
-      case Field.Range(a, b, step) => {
-        def range(x: CanMatch, s: Int = 0): Stream[CanMatch] =
-          (s, x == b) match {
-            case (0, true)  => Stream(x)
-            case (_, true)  => Stream.empty
-            case (0, false) => x #:: range(x.plus(1), step - 1)
-            case (_, false) => range(x.plus(1), s - 1)
-          }
-
-        range(a).exists(_.matches(value))
-      }
+      case r@Field.Range(_, _, _) =>
+        r.exists(_.matches(value))
 
       case Field.Sequence(fs) =>
         fs.exists(_.matches(value))
@@ -190,11 +181,31 @@ sealed trait Field[+T <: CanMatch] {
 }
 
 object Field {
-  final case class Every[T <: CanMatch]() extends Field[T]
-  final case class Exact[T <: CanMatch](value: T) extends Field[T]
-  final case class Range[T <: CanMatch](from: T, to: T, step: Int = 1) extends Field[T]
-  final case class Sequence[T <: CanMatch](fields: Seq[Field[T]]) extends Field[T]
+  final case class Every[T <: CanMatch[T]]() extends Field[T]
+  final case class Exact[T <: CanMatch[T]](value: T) extends Field[T]
+  final case class Range[T <: CanMatch[T]](from: T, to: T, step: Int = 1) extends Field[T] {
+    private[this] def range: Stream[T] =
+      range(from)
+
+    private[this] def range(x: T, s: Int = 0): Stream[T] =
+      (s, x == to) match {
+        case (0, true)  => Stream(x)
+        case (_, true)  => Stream.empty
+        case (0, false) => x #:: range(x.plus(1), step - 1)
+        case (_, false) => range(x.plus(1), s - 1)
+      }
+
+    def exists(p: T => Boolean): Boolean =
+      range.exists(p)
+  }
+
+  final case class Sequence[T <: CanMatch[T]](fields: Seq[Field[T]]) extends Field[T]
 }
+
+
+/** An exception that is raised at runtime for any unrepresentable Spec. */
+case class InvalidSpec(message: String = "", cause: Throwable = null)
+  extends Exception(message, cause)
 
 
 /** A structure representing a crontab entry's time and date
@@ -206,6 +217,10 @@ case class Spec(
   day: Field[Day],
   month: Field[Month],
   weekday: Field[Weekday]) {
+
+  import Field._
+
+  validate()
 
   /** Returns a [[Stream]] of [[ZonedDateTime]]s that match this spec
     * starting from the very next minute. */
@@ -237,6 +252,22 @@ case class Spec(
       now = now.plusMinutes(1)
 
     now
+  }
+
+  // Ensures that *some* impossible Specs cannot be represented.
+  private[this] def validate(): Unit = {
+    (day, month) match {
+      case (Exact(Day(d)), Exact(m)) =>
+        if (d > m.maxDaysInMonth)
+          throw new InvalidSpec(s"day cannot be $d for month $m")
+
+      case (r@Range(_, _, _), Exact(m)) =>
+        if (!r.exists(_.value <= m.maxDaysInMonth))
+          throw new InvalidSpec(s"range of days cannot be $r for month $m")
+
+      case _ =>
+        ()
+    }
   }
 }
 
@@ -277,6 +308,9 @@ object Spec {
       case Failure(e: ParseError) =>
         Left(parser.formatError(e))
 
+      case Failure(e: InvalidSpec) =>
+        Left(s"Invalid spec: ${e.getMessage}")
+
       case Failure(e) =>
         Left(s"Unexpected error while parsing: ${e.getMessage}")
     }
@@ -287,7 +321,7 @@ object Spec {
     minute  = Exact(Minute(0)),
     hour    = Exact(Hour(0)),
     day     = Exact(Day(1)),
-    month   = Exact(Jan),
+    month   = Exact[Month](Jan),
     weekday = Every[Weekday]
   )
 
@@ -306,7 +340,7 @@ object Spec {
     hour    = Exact(Hour(0)),
     day     = Every[Day],
     month   = Every[Month],
-    weekday = Exact(Sun)
+    weekday = Exact[Weekday](Sun)
   )
 
   /** A [[Spec]] representing a job that is run on a daily basis. */
