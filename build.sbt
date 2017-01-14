@@ -2,7 +2,7 @@ name := "crontab"
 
 organization := "io.defn"
 
-version := "0.0.1"
+version := "0.1.0"
 
 scalaVersion in ThisBuild := "2.11.8"
 scalacOptions ++= Seq(
