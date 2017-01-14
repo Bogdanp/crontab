@@ -93,7 +93,7 @@ private class SpecParser(val input: ParserInput) extends Parser {
 
   def range[T <: CanMatch[T]](inner: Meta[T]) = rule {
     inner() ~ '-' ~!~ inner() ~> { (a: T, b: T) =>
-      test(a <= b).named(s"an increasing range, not '$a-$b'") ~ push(Range(a, b))
+      test(a < b).named(s"an increasing range, not '$a-$b'") ~ push(Range(a, b))
     }
   }
 

@@ -184,6 +184,8 @@ object Field {
   final case class Every[T <: CanMatch[T]]() extends Field[T]
   final case class Exact[T <: CanMatch[T]](value: T) extends Field[T]
   final case class Range[T <: CanMatch[T]](from: T, to: T, step: Int = 1) extends Field[T] {
+    require(from < to, s"${from} must be strictly less than ${to}")
+
     private[this] def range: Stream[T] =
       range(from)
 

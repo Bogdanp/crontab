@@ -104,6 +104,7 @@ class SpecParserSpec extends FunSpec with Matchers {
           """.stripMargin.trim
 
         Spec.parse("10-5 * * * *") shouldEqual Left(message)
+        Spec.parse("10-10 * * * *") shouldBe a [Left[_, _]]
       }
 
       it("should fail to parse invalid dates") {
