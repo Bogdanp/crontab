@@ -7,19 +7,24 @@ import org.parboiled2.ParseError
 import scala.util.{Failure, Success}
 
 
+/** */
 trait CanMatch[Self <: CanMatch[_]] extends Ordered[Self] {
+  /** This instance's Int representation.  Used for comparisons and matching. */
   def value: Int
 
+  def plus(n: Int): Self
+
+  /** Compares two instances of the same type for value equality. */
   def compare(that: Self): Int =
     value - that.value
 
+  /** Returns `true` if this instance's value representation is the same as `other`. */
   def matches(other: Int): Boolean =
     value == other
-
-  def plus(n: Int): Self
 }
 
 
+/** Wraps minute values. */
 final case class Minute(val value: Int) extends CanMatch[Minute] {
   require(0 <= value, "minutes must be >=0")
   require(value < 60, "minutes must be <60")
@@ -29,6 +34,7 @@ final case class Minute(val value: Int) extends CanMatch[Minute] {
 }
 
 
+/** Wraps hour values. */
 final case class Hour(val value: Int) extends CanMatch[Hour] {
   require(0 <= value, "hours must be >=0")
   require(value < 24, "hours must be <24")
@@ -38,6 +44,7 @@ final case class Hour(val value: Int) extends CanMatch[Hour] {
 }
 
 
+/** Wraps day-of-the-month values. */
 final case class Day(val value: Int) extends CanMatch[Day] {
   require(1 <= value, "days must be >=1")
   require(value < 32, "days must be <32")
@@ -163,6 +170,8 @@ object Weekday {
 }
 
 
+/** Represents the individual fields on a [[Spec]], constrained to
+  * specific field types based on the position in said [[Spec]]. */
 sealed trait Field[+T <: CanMatch[_]] {
   def matches(value: Int): Boolean =
     this match {
@@ -205,14 +214,12 @@ object Field {
 }
 
 
-/** An exception that is raised at runtime for any unrepresentable Spec. */
+/** Raised at runtime when constructing invalid [[Spec]] instances. */
 case class InvalidSpec(message: String = "", cause: Throwable = null)
   extends Exception(message, cause)
 
 
-/** A structure representing a crontab entry's time and date
-  * specification.
-  */
+/** Represents a crontab entry's time and date specification. */
 case class Spec(
   minute: Field[Minute],
   hour: Field[Hour],
@@ -237,8 +244,7 @@ case class Spec(
     dateTime #:: dateTimes(dateTime.plusMinutes(1))
   }
 
-  /** Returns `true` if this [[Spec]] matches the given
-    * [[ZonedDateTime]]. */
+  /** Returns `true` if this [[Spec]] matches the given `dateTime`. */
   def matches(dateTime: ZonedDateTime): Boolean =
     ( minute.matches(dateTime.getMinute())
       && hour.matches(dateTime.getHour())
@@ -247,6 +253,7 @@ case class Spec(
       && weekday.matches(dateTime.getDayOfWeek().getValue())
     )
 
+  /** Returns the next [[ZonedDateTime]] after [[start]]. */
   private[this] def next(start: ZonedDateTime): ZonedDateTime = {
     var now = start.withSecond(0).withNano(0)
 
@@ -256,7 +263,7 @@ case class Spec(
     now
   }
 
-  // Ensures that *some* impossible Specs cannot be represented.
+  /** Ensures that *some* impossible Specs cannot be represented. */
   private[this] def validate(): Unit = {
     (day, month) match {
       case (Exact(Day(d)), Exact(m)) =>
@@ -276,20 +283,7 @@ case class Spec(
 
 /** Parses crontab time and date specs according to `man 5 crontab`.
   *
-  * {{{
-  * scala> val Right(c) = Spec.parse("* * * * *")
-  * c: Spec = Spec(Every(), Every(), Every(), Every(), Every())
-  * }}}
-  *
-  * Parsing can fail:
-  *
-  * {{{
-  * scala> val Left(error) = Spec.parse("foo")
-  * error: String =
-  * Invalid input 'f', expected a spec like '0 * * * Sun' or a named rule like '@daily' (line 1, column 1):
-  * foo
-  * ^
-  * }}}
+  * See [[crontab]] for more information.
   */
 object Spec {
   import Field._
@@ -297,8 +291,7 @@ object Spec {
   import Weekday._
 
   /** Attempt to parse a string to a [[Spec]].  Returns either
-    * [[Spec]] on success or [[String]] on error
-    * indicating the parse error.
+    * a [[Spec]] or a string indicating the parse error.
     */
   def parse(input: String): Either[String, Spec] = {
     val parser = new SpecParser(input)
@@ -318,7 +311,7 @@ object Spec {
     }
   }
 
-  /** A [[Spec]] representing a job that is run on a yearly basis. */
+  /** Represents a job that is run on an annual basis. */
   lazy val yearly = Spec(
     minute  = Exact(Minute(0)),
     hour    = Exact(Hour(0)),
@@ -327,7 +320,10 @@ object Spec {
     weekday = Every[Weekday]
   )
 
-  /** A [[Spec]] representing a job that is run on a monthly basis. */
+  /** Alias for [[yearly]]. */
+  lazy val annually = yearly
+
+  /** Represents a job that is run on a monthly basis. */
   lazy val monthly = Spec(
     minute  = Exact(Minute(0)),
     hour    = Exact(Hour(0)),
@@ -336,7 +332,7 @@ object Spec {
     weekday = Every[Weekday]
   )
 
-  /** A [[Spec]] representing a job that is run every Sunday. */
+  /** Represents a job that is run every Sunday. */
   lazy val weekly = Spec(
     minute  = Exact(Minute(0)),
     hour    = Exact(Hour(0)),
@@ -345,7 +341,7 @@ object Spec {
     weekday = Exact[Weekday](Sun)
   )
 
-  /** A [[Spec]] representing a job that is run on a daily basis. */
+  /** Represents a job that is run on a daily basis. */
   lazy val daily = Spec(
     minute  = Exact(Minute(0)),
     hour    = Exact(Hour(0)),
@@ -354,7 +350,10 @@ object Spec {
     weekday = Every[Weekday]
   )
 
-  /** A [[Spec]] representing a job that is run on an hourly basis. */
+  /** Alias for [[daily]]. */
+  lazy val midnight = daily
+
+  /** Represents a job that is run on an hourly basis. */
   lazy val hourly = Spec(
     minute  = Exact(Minute(0)),
     hour    = Every[Hour],
