@@ -1,6 +1,6 @@
 organization := "io.defn"
 name := "crontab"
-version := "0.1.0"
+version := "0.1.1"
 licenses := Seq("BSD-3" -> url("https://github.com/Bogdanp/crontab/blob/master/LICENSE"))
 homepage := Some(url("https://github.com/Bogdanp/crontab"))
 
