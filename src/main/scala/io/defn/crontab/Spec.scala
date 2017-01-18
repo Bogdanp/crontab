@@ -7,7 +7,6 @@ import org.parboiled2.ParseError
 import scala.util.{Failure, Success}
 
 
-/** */
 trait CanMatch[Self <: CanMatch[_]] extends Ordered[Self] {
   /** This instance's Int representation.  Used for comparisons and matching. */
   def value: Int
@@ -215,8 +214,7 @@ object Field {
 
 
 /** Raised at runtime when constructing invalid [[Spec]] instances. */
-case class InvalidSpec(message: String = "", cause: Throwable = null)
-  extends Exception(message, cause)
+case class InvalidSpec(message: String = "") extends Exception(message)
 
 
 /** Represents a crontab entry's time and date specification. */
