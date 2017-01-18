@@ -68,5 +68,10 @@ package io.defn
   * scala> spec.matches(now.plusDays(5).atZone(ZoneId.of("UTC")))
   * res2: Boolean = true
   * }}}
+  *
+  * ===Warning===
+  * It is possible for certain specs to cause `dateTimes` to loop
+  * infinitely (i.e. when no upcoming date times match the spec) so
+  * handle user-input specs with extra care.
   */
 package object crontab
