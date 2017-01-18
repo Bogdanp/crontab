@@ -69,4 +69,4 @@ package io.defn
   * res2: Boolean = true
   * }}}
   */
-package object crontab {}
+package object crontab
